@@ -45,13 +45,12 @@ type Man struct {
 	logfiles map[string]*logfile
 	filemap  map[time.Time]string
 
-	one sync.Once
-	mu  sync.Mutex
-	wg  sync.WaitGroup
+	mu sync.Mutex
+	wg sync.WaitGroup
 }
 
 func (m *Man) waitAll() {
-	log.Printf("quit goroutines: %d, cgocalls: %d", runtime.NumGoroutine(), runtime.NumCgoCall())
+	log.Printf("quit goroutines: %d", runtime.NumGoroutine())
 	m.mu.Lock()
 	for filename, lf := range m.logfiles {
 		lf.close()
