@@ -1,0 +1,4 @@
+log
+.vscode
+examples/go.mod
+examples/go.sum
