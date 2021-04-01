@@ -35,15 +35,15 @@ type Man struct {
 	Timing     string //Such as daily, hourly, minutely, secondly(for testing)
 	Level      zapcore.Level
 
-	millCh    chan bool //Used for compress, remove old logfiles.
-	startMill sync.Once
-
 	timeFormat string    //The time format layout.
 	logtime    time.Time //Assign just the second, minute, hour, day.
 	curtime    time.Time //Assign just the second, minute, hour, day.
 
 	logfiles map[string]*logfile
 	filemap  map[time.Time]string
+
+	millCh    chan bool
+	startMill sync.Once
 
 	mu sync.Mutex
 	wg sync.WaitGroup
@@ -106,20 +106,32 @@ func (m *Man) rotate(filename string) *logfile {
 func (m *Man) mill() {
 	m.startMill.Do(func() {
 		m.millCh = make(chan bool)
-		go m.millRunOnce()
+		go m.millRun()
 	})
+	select {
+	case m.millCh <- true:
+	default:
+	}
 }
 
-func (m *Man) millRunOnce() {
+func (m *Man) millRun() {
+	for range m.millCh {
+		_ = m.millRunOnce()
+	}
+}
+
+func (m *Man) millRunOnce() error {
 	if m.MaxBackups == 0 && m.MaxAge == 0 && !m.Compress {
-		return
+		return nil
 	}
 
 	files, err := m.oldLogFiles()
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
+	// for _, f := range files {
+	// 	fmt.Printf("================================%s %s\n", f.timestamp, f.Name())
+	// }
 
 	var compress, remove []logInfo
 
@@ -127,9 +139,11 @@ func (m *Man) millRunOnce() {
 		var preserved int
 		var remaining []logInfo
 		for _, f := range files {
-			name := f.Name()
-			if strings.HasSuffix(name, compressSuffix) {
-				name = name[:len(name)-len(compressSuffix)]
+			// Only count the uncompressed log file or the
+			// compressed log file, not both.
+			fn := f.Name()
+			if strings.HasSuffix(fn, compressSuffix) {
+				fn = fn[:len(fn)-len(compressSuffix)]
 			}
 			preserved++
 
@@ -141,14 +155,17 @@ func (m *Man) millRunOnce() {
 		}
 		files = remaining
 	}
+	// for _, f := range files {
+	// 	fmt.Printf("ramaining, excepting(MaxBackups): %s %s\n", f.timestamp, f.Name())
+	// }
 
 	if m.MaxAge > 0 {
 		diff := time.Duration(int64(24*time.Hour) * int64(m.MaxAge))
-		cut := m.curtime.Add(-1 * diff)
+		cutoff := time.Now().Add(-1 * diff)
 
 		var remaining []logInfo
 		for _, f := range files {
-			if f.timestamp.Before(cut) {
+			if f.timestamp.Before(cutoff) {
 				remove = append(remove, f)
 			} else {
 				remaining = append(remaining, f)
@@ -156,27 +173,44 @@ func (m *Man) millRunOnce() {
 		}
 		files = remaining
 	}
+	// for _, f := range files {
+	// 	fmt.Printf("ramaining, excepting(MaxAge): %s %s\n", f.timestamp, f.Name())
+	// }
 
 	if m.Compress {
+		var backups int
 		for _, f := range files {
 			if !strings.HasSuffix(f.Name(), compressSuffix) {
-				compress = append(compress, f)
+				backups++
+				if backups > m.MaxBackups {
+					compress = append(compress, f)
+				}
 			}
 		}
 	}
 
 	for _, f := range remove {
-		if err := os.Remove(filepath.Join(m.dir(), f.Name())); err != nil {
-			log.Println(err)
+		if time.Now().Sub(f.ModTime()) <= 5*time.Minute { //5 minutes is enough?
+			continue
+		}
+		errRemove := os.Remove(filepath.Join(m.dir(), f.Name()))
+		if err == nil && errRemove != nil {
+			err = errRemove
 		}
 	}
 
 	for _, f := range compress {
-		name := filepath.Join(m.dir(), f.Name())
-		if err := compressLogFile(name, name+compressSuffix); err != nil {
-			log.Println(err)
+		if time.Now().Sub(f.ModTime()) <= 5*time.Minute { //5 minutes is enough?
+			continue
+		}
+		fn := filepath.Join(m.dir(), f.Name())
+		errCompress := compressLogFile(fn, fn+compressSuffix)
+		if err == nil && errCompress != nil {
+			err = errCompress
 		}
 	}
+
+	return err
 }
 
 func compressLogFile(src, dst string) error {
@@ -237,10 +271,12 @@ func (m *Man) oldLogFiles() ([]logInfo, error) {
 
 		if t, err := m.timeFromName(file.Name(), prefix, ext); err == nil {
 			logFiles = append(logFiles, logInfo{t, file})
+			continue
 		}
 
 		if t, err := m.timeFromName(file.Name(), prefix, ext+compressSuffix); err == nil {
 			logFiles = append(logFiles, logInfo{t, file})
+			continue
 		}
 	}
 
@@ -261,7 +297,7 @@ func (m *Man) timeFromName(name, prefix, ext string) (time.Time, error) {
 }
 
 func (m *Man) prefixAndExt() (string, string) {
-	filename := m.Filename
+	filename := filepath.Base(m.Filename)
 	ext := filepath.Ext(filename)
 	prefix := filename[:len(filename)-len(ext)] + "_"
 	return prefix, ext

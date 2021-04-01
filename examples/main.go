@@ -44,7 +44,7 @@ func main() {
 
 	defer ants.Release()
 
-	runTimes := 1000000
+	runTimes := 2000000
 
 	demo1 := func() {
 		logger.Info("A")
