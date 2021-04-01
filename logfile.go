@@ -16,7 +16,7 @@ type logfile struct {
 	buff  *bufio.Writer
 	start sync.Once
 
-	m *Man
+	m *Logman
 }
 
 const _size = 0 //8kb

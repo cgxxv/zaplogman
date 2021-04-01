@@ -20,13 +20,14 @@ func main() {
 		log.Printf("duration: %vs", time.Now().Sub(startat).Seconds())
 	}()
 	defer profile.Start().Stop()
-	man := &zaplogman.Man{
+	man := &zaplogman.Logman{
 		Filename:   "./log/foo.log",
 		MaxBackups: 10,
 		MaxAge:     5, // days
 		Compress:   true,
 		Timing:     zaplogman.SECONDLY,
 		Level:      zapcore.DebugLevel,
+		SelfOutput: true,
 	}
 	cfg := zap.NewProductionEncoderConfig()
 	cfg.TimeKey = "time"
@@ -44,7 +45,7 @@ func main() {
 
 	defer ants.Release()
 
-	runTimes := 2000000
+	runTimes := 1000000
 
 	demo1 := func() {
 		logger.Info("A")

@@ -27,13 +27,14 @@ const (
 	compressSuffix = ".gz"
 )
 
-type Man struct {
+type Logman struct {
 	Filename   string //The logfile for storing log.
 	MaxAge     int    //The maximum days for retain old logfiles.
 	MaxBackups int    //The maximun number for ratain raw logfiles.
 	Compress   bool   //The switch for compress the old logfiles.
 	Timing     string //Such as daily, hourly, minutely, secondly(for testing)
 	Level      zapcore.Level
+	SelfOutput bool //Disable or enable the logman output debug information.
 
 	timeFormat string    //The time format layout.
 	logtime    time.Time //Assign just the second, minute, hour, day.
@@ -49,7 +50,7 @@ type Man struct {
 	wg sync.WaitGroup
 }
 
-func (m *Man) waitAll() {
+func (m *Logman) waitAll() {
 	log.Printf("quit goroutines: %d", runtime.NumGoroutine())
 	m.mu.Lock()
 	for filename, lf := range m.logfiles {
@@ -61,7 +62,7 @@ func (m *Man) waitAll() {
 	m.wg.Wait()
 }
 
-func (m *Man) dispatch(t time.Time, p []byte) error {
+func (m *Logman) dispatch(t time.Time, p []byte) error {
 	m.mu.Lock()
 
 	m.setlogtime(t)
@@ -82,7 +83,7 @@ func (m *Man) dispatch(t time.Time, p []byte) error {
 	return nil
 }
 
-func (m *Man) rotate(filename string) *logfile {
+func (m *Logman) rotate(filename string) *logfile {
 	lf := &logfile{
 		filename: filename,
 		logtime:  m.logtime,
@@ -103,7 +104,7 @@ func (m *Man) rotate(filename string) *logfile {
 	return lf
 }
 
-func (m *Man) mill() {
+func (m *Logman) mill() {
 	m.startMill.Do(func() {
 		m.millCh = make(chan bool)
 		go m.millRun()
@@ -114,13 +115,13 @@ func (m *Man) mill() {
 	}
 }
 
-func (m *Man) millRun() {
+func (m *Logman) millRun() {
 	for range m.millCh {
 		_ = m.millRunOnce()
 	}
 }
 
-func (m *Man) millRunOnce() error {
+func (m *Logman) millRunOnce() error {
 	if m.MaxBackups == 0 && m.MaxAge == 0 && !m.Compress {
 		return nil
 	}
@@ -129,9 +130,9 @@ func (m *Man) millRunOnce() error {
 	if err != nil {
 		return err
 	}
-	// for _, f := range files {
-	// 	fmt.Printf("================================%s %s\n", f.timestamp, f.Name())
-	// }
+	for _, f := range files {
+		log.Printf("oldfile: %s %s\n", f.timestamp, f.Name())
+	}
 
 	var compress, remove []logInfo
 
@@ -155,9 +156,9 @@ func (m *Man) millRunOnce() error {
 		}
 		files = remaining
 	}
-	// for _, f := range files {
-	// 	fmt.Printf("ramaining, excepting(MaxBackups): %s %s\n", f.timestamp, f.Name())
-	// }
+	for _, f := range files {
+		log.Printf("ramaining, excepting MaxBackups: %s %s\n", f.timestamp, f.Name())
+	}
 
 	if m.MaxAge > 0 {
 		diff := time.Duration(int64(24*time.Hour) * int64(m.MaxAge))
@@ -173,9 +174,9 @@ func (m *Man) millRunOnce() error {
 		}
 		files = remaining
 	}
-	// for _, f := range files {
-	// 	fmt.Printf("ramaining, excepting(MaxAge): %s %s\n", f.timestamp, f.Name())
-	// }
+	for _, f := range files {
+		log.Printf("ramaining, excepting MaxAge: %s %s\n", f.timestamp, f.Name())
+	}
 
 	if m.Compress {
 		var backups int
@@ -255,7 +256,7 @@ func compressLogFile(src, dst string) error {
 	return nil
 }
 
-func (m *Man) oldLogFiles() ([]logInfo, error) {
+func (m *Logman) oldLogFiles() ([]logInfo, error) {
 	files, err := ioutil.ReadDir(m.dir())
 	if err != nil {
 		log.Println(err)
@@ -285,7 +286,7 @@ func (m *Man) oldLogFiles() ([]logInfo, error) {
 	return logFiles, nil
 }
 
-func (m *Man) timeFromName(name, prefix, ext string) (time.Time, error) {
+func (m *Logman) timeFromName(name, prefix, ext string) (time.Time, error) {
 	if !strings.HasPrefix(name, prefix) {
 		return time.Time{}, errors.New("mismatched prefix")
 	}
@@ -296,18 +297,18 @@ func (m *Man) timeFromName(name, prefix, ext string) (time.Time, error) {
 	return time.Parse(m.getTimeFormat(), ts)
 }
 
-func (m *Man) prefixAndExt() (string, string) {
+func (m *Logman) prefixAndExt() (string, string) {
 	filename := filepath.Base(m.Filename)
 	ext := filepath.Ext(filename)
 	prefix := filename[:len(filename)-len(ext)] + "_"
 	return prefix, ext
 }
 
-func (m *Man) dir() string {
+func (m *Logman) dir() string {
 	return filepath.Dir(m.filename())
 }
 
-func (m *Man) filename() string {
+func (m *Logman) filename() string {
 	if filename, ok := m.filemap[m.logtime]; ok {
 		return filename
 	}
@@ -333,13 +334,13 @@ func (m *Man) filename() string {
 	return ret
 }
 
-func (m *Man) setlogtime(t time.Time) {
+func (m *Logman) setlogtime(t time.Time) {
 	s := t.Local().Format(m.getTimeFormat())
 	t, _ = time.Parse(m.getTimeFormat(), s)
 	m.logtime = t
 }
 
-func (m *Man) getTimeFormat() string {
+func (m *Logman) getTimeFormat() string {
 	if m.timeFormat != "" {
 		return m.timeFormat
 	}

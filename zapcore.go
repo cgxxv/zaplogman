@@ -1,19 +1,24 @@
 package zaplogman
 
 import (
+	"io"
+	"log"
 	"time"
 
 	"go.uber.org/zap/zapcore"
 )
 
 type core struct {
-	man *Man
+	man *Logman
 	enc zapcore.Encoder
 }
 
-func NewCore(enc zapcore.Encoder, man *Man) zapcore.Core {
+func NewCore(enc zapcore.Encoder, man *Logman) zapcore.Core {
 	man.logfiles = make(map[string]*logfile)
 	man.filemap = make(map[time.Time]string)
+	if !man.SelfOutput {
+		log.SetOutput(io.Discard)
+	}
 	return &core{
 		man: man,
 		enc: enc,
