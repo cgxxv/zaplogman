@@ -1,4 +1,4 @@
-package logman
+package zaplogman
 
 import (
 	"compress/gzip"

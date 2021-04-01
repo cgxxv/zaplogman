@@ -8,7 +8,7 @@ import (
 
 	"github.com/panjf2000/ants/v2"
 	"github.com/pkg/profile"
-	logman "github.com/wk30/zap-logman"
+	"github.com/wk30/zaplogman"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -20,18 +20,18 @@ func main() {
 		log.Printf("duration: %vs", time.Now().Sub(startat).Seconds())
 	}()
 	defer profile.Start().Stop()
-	man := &logman.Man{
+	man := &zaplogman.Man{
 		Filename:   "./log/foo.log",
 		MaxBackups: 10,
 		MaxAge:     5, // days
 		Compress:   true,
-		Timing:     logman.SECONDLY,
+		Timing:     zaplogman.SECONDLY,
 		Level:      zapcore.DebugLevel,
 	}
 	cfg := zap.NewProductionEncoderConfig()
 	cfg.TimeKey = "time"
 	cfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000000000")
-	core := logman.NewCore(
+	core := zaplogman.NewCore(
 		zapcore.NewJSONEncoder(cfg),
 		man,
 	)

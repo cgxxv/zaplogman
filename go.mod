@@ -1,4 +1,4 @@
-module github.com/wk30/zap-logman
+module github.com/wk30/zaplogman
 
 go 1.16
 
