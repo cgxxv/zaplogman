@@ -25,6 +25,11 @@ func (l *logfile) exit() {
 	for {
 		time.Sleep(1 * time.Second)
 
+		//Keep one second is good enough????
+		if time.Now().Sub(l.logtime) <= 1*time.Second {
+			continue
+		}
+
 		info, err := os.Stat(l.filename)
 		if err != nil {
 			log.Println(err)
