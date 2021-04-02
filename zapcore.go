@@ -26,11 +26,11 @@ func NewCore(enc zapcore.Encoder, man *Logman) zapcore.Core {
 }
 
 func (c *core) With(fields []zapcore.Field) zapcore.Core {
-	// clone := c.clone()
+	clone := c.clone()
 	for i := range fields {
-		fields[i].AddTo(c.enc)
+		fields[i].AddTo(clone.enc)
 	}
-	return c
+	return clone
 }
 
 func (c *core) Enabled(lvl zapcore.Level) bool {

@@ -5,7 +5,7 @@ The project is aimed at managing the log files by time, eg: daily, hourly. The i
 
 ## usage
 ```go
-w := &zaplogman.Manager{
+w := &zaplogman.Logman{
   Filename:  "./log/foo.log",
   MaxRawAge: 10,
   MaxAge:    5, // days
