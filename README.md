@@ -7,7 +7,7 @@ The project is aimed at managing the log files by time, eg: daily, hourly. The i
 ```go
 w := &zaplogman.Logman{
   Filename:  "./log/foo.log",
-  MaxRawAge: 10,
+  MaxBackups:10,
   MaxAge:    5, // days
   Compress:  true,
   Timing:    zaplogman.HOURLY,
@@ -15,7 +15,7 @@ w := &zaplogman.Logman{
 }
 cfg := zap.NewProductionEncoderConfig()
 cfg.TimeKey = "time"
-cfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000000000")
+cfg.EncodeTime = zapcore.TimeEncoderOfLayout("2006-01-02 15:04:05.000")
 core := zaplogman.NewCore(
   zapcore.NewJSONEncoder(cfg),
   w,
