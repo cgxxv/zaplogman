@@ -1,7 +1,7 @@
 package zaplogman
 
 import (
-	"io"
+	"io/ioutil"
 	"log"
 	"time"
 
@@ -17,7 +17,7 @@ func NewCore(enc zapcore.Encoder, man *Logman) zapcore.Core {
 	man.logfiles = make(map[string]*logfile)
 	man.filemap = make(map[time.Time]string)
 	if !man.SelfOutput {
-		log.SetOutput(io.Discard)
+		log.SetOutput(ioutil.Discard)
 	}
 	return &core{
 		man: man,
